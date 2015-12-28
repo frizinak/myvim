@@ -4,6 +4,7 @@
 set -u
 set -e
 
+EXCLUDES=$(cat ./excludes 2>/dev/null || echo -n '')
 EDIT=0
 COMPRESS=-z
 OUTPUT=vim.$(whoami)
@@ -43,9 +44,15 @@ get_md5() {
 }
 
 list() {
+  local exclude_opts i
+  exclude_opts="-name .git -o -name .hg -o -name .svn"
+  for i in $EXCLUDES; do
+      exclude_opts="$exclude_opts -o -wholename $i"
+  done
+
   (cd ~ &&
    find -L .vim $VIMRC \
-   \( -name .git -o -name .hg -o -name .svn \) -prune \
+   \( $exclude_opts \) -prune \
    -o ! -type d -print) | eval "$GREPV"
 }
 
