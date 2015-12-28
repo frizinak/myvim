@@ -94,19 +94,7 @@ generate() {
   echo '#!/usr/bin/env bash
 # Created at: '$(date)'
 '"$ENV_VARS"'
-if [ "$1" == --hard ]; then
-  HARD=1
-  BASE=~
-  echo "** Overwriting ~/.vim and ~/'"$VIMRC"' **"
-  for e in ~/.vim ~/'"$VIMRC"'; do
-    rm -rf ${e}.bak
-    [ -e $e ] && mv ${e} ${e}.bak
-  done
-  shift
-else
-  HARD=""
-  BASE=/tmp/myvim-$(whoami)/'$MD5'
-fi
+BASE=/tmp/myvim-$(whoami)/'$MD5'
 
 set -eu
 
@@ -114,7 +102,8 @@ if [ ! -d $BASE/.vim ]; then
   >&2 echo "Extracting Vim environment to $BASE"
   mkdir -p $BASE
   sed "1,/^# EOF #$/d" "$0" | tar -C $BASE -x '$COMPRESS'
-  [ -z "$HARD" ] && (cd $BASE
+  (cd $BASE
+   echo '"$VIMRC"'
    mv -f '"$VIMRC"' '"$VIMRC"'.org
    echo "let [s:home_org, \$HOME] = [\$HOME, \"$BASE\"]" > '"$VIMRC"'
    echo "set rtp^=$BASE/.vim" >> '"$VIMRC"'
