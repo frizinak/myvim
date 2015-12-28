@@ -4,11 +4,10 @@
 set -u
 set -e
 
-EXCLUDES=$(cat ./excludes 2>/dev/null || echo -n '')
+UPLOAD=1
 EDIT=0
 COMPRESS=-z
 OUTPUT=vim.$(whoami)
-GREPV="cat"
 VIMRC=.vimrc
 if [ ! -e ~/$VIMRC ]; then
   if [ -e ~/.vim/vimrc ]; then
@@ -20,17 +19,17 @@ if [ ! -e ~/$VIMRC ]; then
 fi
 
 usage() {
-  echo "usage: $0 [-e|--edit] [--exclude PATTERN] [-j] [output]"
+  echo "usage: $0 [-e|--edit]  [-U] [-j] [output]"
 }
 
 while [ $# -gt 0 ]; do
   case $1 in
-    -e|--edit) EDIT=1 ;;
-    -z|-j)     COMPRESS=$1 ;;
-    --exclude) shift; GREPV="grep -v $(printf %q "$1")" ;;
-    -h|--help) usage; exit 0 ;;
-    -*)        echo "$0: Unrecognized option $1"; exit 1 ;;
-    *)         OUTPUT=$1 ;;
+    -e|--edit)      EDIT=1 ;;
+    -z|-j)          COMPRESS=$1 ;;
+    -h|--help)      usage; exit 0 ;;
+    -U|--no-upload) UPLOAD=0 ;;
+    -*)             echo "$0: Unrecognized option $1"; exit 1 ;;
+    *)              OUTPUT=$1 ;;
   esac
   shift
 done
@@ -44,16 +43,22 @@ get_md5() {
 }
 
 list() {
-  local exclude_opts i
-  exclude_opts="-name .git -o -name .hg -o -name .svn"
-  for i in $EXCLUDES; do
-      exclude_opts="$exclude_opts -o -wholename $i"
-  done
+  local opts i exfiles
+  exfiles=''
+  opts="-L .vim $VIMRC \( -name .git -o -name .hg -o -name .svn"
+  while read -r i; do
+    if [ "${i:0:1}" != "/" ]; then
+        exfiles="$exfiles ! -name $(printf %q "$i")"
+      continue
+    fi
 
-  (cd ~ &&
-   find -L .vim $VIMRC \
-   \( $exclude_opts \) -prune \
-   -o ! -type d -print) | eval "$GREPV"
+    opts="$opts -o -wholename $(printf %q "${i:1}")"
+  done < ./excludes
+
+  opts="$opts \) -prune -o "$exfiles" ! -type d -print"
+  echo find $opts >&2
+
+  eval "cd ~ && find $opts"
 }
 
 gitenv() {
@@ -86,7 +91,7 @@ generate() {
     FILES=$(list)
   fi
 
-  TEMP=/tmp/myvim-$(whoami).tar.compressed
+  TEMP=/tmp/myvim-$(whoami).tar.gz
   tar -C ~ -h $COMPRESS -cf $TEMP -T <(echo "$FILES")
 
   MD5=$(get_md5 "$TEMP")
@@ -118,8 +123,17 @@ exit $?
 # EOF #' > "$OUTPUT"
   cat "$TEMP" >> "$OUTPUT"
   chmod +x "$OUTPUT"
+  tar -tvf "$TEMP" | sort -n -k3,3
   echo "Created $OUTPUT executable"
   rm -f "$TEMP"
+}
+
+upload() {
+  local IFS i
+  IFS=$'\n'
+  while read -r i; do
+    cat $OUTPUT | eval $i
+  done < ./remotes
 }
 
 if [ ! -e ~/.vim ]; then
@@ -127,4 +141,5 @@ if [ ! -e ~/.vim ]; then
 fi
 
 generate
+[ $UPLOAD -eq 1 ] && upload
 

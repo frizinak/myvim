@@ -1,0 +1,2 @@
+ssh server 'cat > ~/my-vim; chmod +x ~/my-vim'
+
