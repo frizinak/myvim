@@ -53,7 +53,7 @@ list() {
     fi
 
     opts="$opts -o -wholename $(printf %q "${i:1}")"
-  done < ./excludes
+  done < ./excludes 2>/dev/null || echo "No excludes"
 
   opts="$opts \) -prune -o "$exfiles" ! -type d -print"
   echo find $opts >&2
@@ -129,11 +129,11 @@ exit $?
 }
 
 upload() {
-  local IFS i
-  IFS=$'\n'
   while read -r i; do
-    cat $OUTPUT | eval $i
-  done < ./remotes
+    if [ "$i" = "" ]; then continue; fi
+    echo "remote: $i"
+    cat $OUTPUT | eval "$i"
+  done < ./remotes 2>/dev/null || echo "No remotes"
 }
 
 if [ ! -e ~/.vim ]; then
